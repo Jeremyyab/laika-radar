@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Laika Radar</title>
+<meta name="description" content="Laika, la pechera inteligente: ubicación en tiempo real, buzzer y luz para encontrar a tu mascota.">
+<meta name="theme-color" content="#0F1930">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:title" content="Laika Radar">
+<meta property="og:description" content="Más cerca, siempre. Ubicación en tiempo real de la pechera inteligente Laika.">
+<meta property="og:image" content="assets/laika-astronauta.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: consola de misión nocturna. Radar grande a la izquierda; telemetría, controles y bitácora a la derecha. En móvil se apila. */
+:root{
+  --night:#0F1930;
+  --panel:#1B2A4A;
+  --panel-2:#22355B;
+  --line:rgba(78,155,166,.28);
+  --teal:#2E6E7E;
+  --teal-2:#4E9BA6;
+  --cream:#EFE3C8;
+  --muted:#A3B1BC;
+  --orange:#E07B39;
+  --rust:#C4553B;
+  --f-display:"Fredoka","Baloo 2",ui-rounded,system-ui,sans-serif;
+  --f-body:"Nunito Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background-color:var(--night);
+  background-image:
+    radial-gradient(1.2px 1.2px at 24px 38px,rgba(239,227,200,.55) 50%,transparent 52%),
+    radial-gradient(1px 1px at 130px 90px,rgba(239,227,200,.4) 50%,transparent 52%),
+    radial-gradient(1.6px 1.6px at 80px 160px,rgba(224,123,57,.45) 50%,transparent 52%),
+    radial-gradient(1px 1px at 190px 20px,rgba(78,155,166,.6) 50%,transparent 52%);
+  background-size:220px 220px,170px 170px,310px 310px,260px 260px;
+  color:var(--cream);
+  font-family:var(--f-body);
+  font-size:15px;
+  line-height:1.5;
+  padding-inline:16px;
+  padding-block:20px 32px;
+  min-height:100%;
+}
+.wrap{max-width:1160px;margin-inline:auto;display:flex;flex-direction:column;gap:20px}
+
+/* Encabezado */
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px}
+.brand{display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap}
+.logo{margin:0;line-height:0}
+.patch{display:inline-flex;max-width:100%;background:#FDF9ED;border-radius:16px;padding:10px 16px;box-shadow:0 0 0 2px var(--night),0 0 0 4px rgba(239,227,200,.35),0 10px 30px rgba(0,0,0,.35);transform:rotate(-1.5deg)}
+.patch img{display:block;height:clamp(56px,13vw,100px);width:auto;max-width:100%}
+.tagline{color:var(--muted);font-size:.95rem;letter-spacing:.04em;display:flex;align-items:center;gap:8px}
+.tagline::before{content:"";width:7px;height:7px;background:var(--orange);clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%)}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-family:var(--f-mono);font-size:.78rem;letter-spacing:.04em;border:1px solid var(--line);background:var(--panel);white-space:nowrap}
+.pill i{width:9px;height:9px;border-radius:50%;background:var(--teal-2);display:block}
+.pill[data-s="ok"] i{background:var(--teal-2);box-shadow:0 0 0 4px rgba(78,155,166,.2)}
+.pill[data-s="demo"] i{background:var(--orange)}
+.pill[data-s="wait"] i{background:var(--muted)}
+.pill[data-s="lost"]{border-color:var(--rust)}
+.pill[data-s="lost"] i{background:var(--rust)}
+
+/* Rejilla principal */
+.grid>section.card{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}
+@media (max-width:880px){.grid>section.card{position:static}}
+.grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:880px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px}
+.side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.card-h h2{font-family:var(--f-display);font-weight:600;font-size:1.1rem;margin:0;letter-spacing:.01em}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+
+/* Radar */
+.radar-box{position:relative;width:100%;max-width:600px;margin-inline:auto;aspect-ratio:1/1}
+.radar-box canvas{width:100%;height:100%;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:center;margin-top:12px;font-size:.85rem;color:var(--muted)}
+.legend b{font-weight:600;color:var(--cream)}
+.lg-ico{display:inline-block;vertical-align:-3px;margin-right:6px;border-radius:50%}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+
+/* Telemetría */
+.tele{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border-radius:12px;overflow:hidden}
+@media (max-width:420px){.tele{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tele div{background:var(--panel-2);padding:12px;min-width:0}
+.tele dt{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tele dd{margin:4px 0 0;font-family:var(--f-mono);font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tele dd small{font-size:.75rem;font-weight:400;color:var(--muted);margin-left:2px}
+.tele .wide{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.tele .wide dd{font-size:.95rem}
+.bat[data-l="low"]{color:var(--rust)}
+.bat[data-l="mid"]{color:var(--orange)}
+
+a.maplink{font-family:var(--f-body);font-weight:600;font-size:.85rem;color:var(--teal-2);text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:1px}
+a.maplink:hover{color:var(--cream)}
+a.maplink[aria-disabled="true"]{pointer-events:none;opacity:.4}
+
+/* Controles */
+.call{width:100%;display:flex;align-items:center;justify-content:center;gap:12px;padding:16px;border:0;border-radius:14px;background:var(--orange);color:#1B1206;font-family:var(--f-display);font-weight:600;font-size:1.25rem;cursor:pointer;transition:transform .12s ease,filter .12s ease}
+.call:hover{filter:brightness(1.07)}
+.call:active{transform:scale(.98)}
+.call small{display:block;font-family:var(--f-body);font-weight:600;font-size:.78rem;opacity:.75}
+.call svg{flex:none}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px}
+.row .lbl b{display:block;font-weight:700}
+.row .lbl span{font-size:.82rem;color:var(--muted)}
+.switch{position:relative;width:52px;height:30px;flex:none}
+.switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.switch span{position:absolute;inset:0;border-radius:999px;background:var(--night);border:1px solid var(--line);transition:background .15s}
+.switch span::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--muted);transition:transform .15s,background .15s}
+.switch input:checked+span{background:var(--teal)}
+.switch input:checked+span::after{transform:translateX(22px);background:var(--cream)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0;background:var(--c)}
+.chip[aria-pressed="true"]{border-color:var(--cream);box-shadow:0 0 0 3px rgba(239,227,200,.18)}
+.chip.off{background:var(--night);color:var(--muted);font-size:.7rem;font-family:var(--f-mono);width:auto;padding:0 10px;border-radius:999px}
+
+/* Bitácora */
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:210px;overflow:auto}
+.log li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;font-size:.86rem}
+.log time{font-family:var(--f-mono);font-size:.76rem;color:var(--teal-2);padding-top:2px;font-variant-numeric:tabular-nums}
+.log li.warn time{color:var(--rust)}
+.log li.cmd time{color:var(--orange)}
+
+/* Conexión */
+details.card summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font-size:1.05rem;list-style:none;display:flex;justify-content:space-between;gap:10px}
+details.card summary::-webkit-details-marker{display:none}
+details.card summary::after{content:"+";color:var(--teal-2);font-family:var(--f-mono)}
+details[open].card summary::after{content:"−"}
+.cfg{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.cfg label{font-size:.85rem;color:var(--muted)}
+.cfg input{width:100%;margin-top:4px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--night);color:var(--cream);font-family:var(--f-mono);font-size:.85rem}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:9px 14px;border-radius:10px;border:1px solid var(--teal-2);background:transparent;color:var(--cream);font-family:var(--f-body);font-weight:700;font-size:.85rem;cursor:pointer}
+.btn.solid{background:var(--teal);border-color:var(--teal)}
+.btn:hover{filter:brightness(1.15)}
+.note{font-size:.82rem;color:var(--muted);margin:0;max-width:65ch}
+pre{margin:0;overflow-x:auto;background:var(--night);border:1px solid var(--line);border-radius:10px;padding:12px;font-family:var(--f-mono);font-size:.76rem;line-height:1.55;color:var(--cream)}
+
+footer{text-align:center;color:var(--muted);font-size:.8rem;letter-spacing:.03em}
+
+:focus-visible{outline:2px solid var(--orange);outline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1 class="logo"><span class="patch"><img src="assets/laika-logo.jpg" alt="Laika" width="1220" height="505"></span></h1>
+      <span class="tagline">Más cerca, siempre</span>
+    </div>
+    <span class="pill" id="status" data-s="demo"><i></i><span id="statusTxt">Demo · datos simulados</span></span>
+  </header>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="radarTitle">
+      <div class="card-h">
+        <h2 id="radarTitle">Radar de misión</h2>
+        <span class="eyebrow" id="scaleTxt">Escala 100 m</span>
+      </div>
+      <div class="radar-box"><canvas id="radar" role="img" aria-label="Radar con la posición de Laika respecto al centro"></canvas></div>
+      <div class="legend">
+        <span><img class="lg-ico" src="assets/laika-astronauta.png" alt="" width="18" height="18"><b>Laika</b></span>
+        <span><i class="dot" style="background:var(--cream)"></i>Centro: <b id="baseLbl">punto de partida</b></span>
+        <span><svg class="lg-ico" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><g fill="var(--teal-2)"><ellipse cx="10" cy="13" rx="4.6" ry="4"/><circle cx="4.2" cy="7.6" r="1.9"/><circle cx="8" cy="4.4" r="1.9"/><circle cx="12" cy="4.4" r="1.9"/><circle cx="15.8" cy="7.6" r="1.9"/></g></svg>Huellas del recorrido</span>
+      </div>
+    </section>
+
+    <div class="side">
+      <section class="card" aria-labelledby="teleTitle">
+        <div class="card-h">
+          <h2 id="teleTitle">Telemetría</h2>
+          <span class="eyebrow">NEO-6M · IdeaBoard</span>
+        </div>
+        <dl class="tele">
+          <div><dt>Distancia</dt><dd id="tDist">—</dd></div>
+          <div><dt>Rumbo</dt><dd id="tDir">—</dd></div>
+          <div><dt>Última señal</dt><dd id="tAge">—</dd></div>
+          <div><dt>Satélites</dt><dd id="tSats">—</dd></div>
+          <div><dt>Batería</dt><dd id="tBat" class="bat">—</dd></div>
+          <div><dt>Velocidad</dt><dd id="tSpd">—</dd></div>
+          <div class="wide"><div><dt>Coordenadas</dt><dd id="tCoords">Esperando la primera posición</dd></div><a class="maplink" id="mapLink" href="#" target="_blank" rel="noopener" aria-disabled="true">Abrir en Google Maps ↗</a></div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="ctrlTitle">
+        <div class="card-h">
+          <h2 id="ctrlTitle">Encontrar a Laika</h2>
+          <span class="eyebrow">Buzzer · NeoPixel</span>
+        </div>
+        <button class="call" id="callBtn" type="button">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+          <span>Llamar a Laika<small>Hace sonar el buzzer de la pechera</small></span>
+        </button>
+        <div class="row">
+          <div class="lbl"><b>Modo búsqueda</b><span>La luz de la pechera parpadea para verla de noche</span></div>
+          <label class="switch"><input type="checkbox" id="searchSw" aria-label="Modo búsqueda"><span></span></label>
+        </div>
+        <div class="row">
+          <div class="lbl"><b>Color de la luz</b><span id="ledTxt">Naranja</span></div>
+          <div class="chips" id="chips">
+            <button class="chip" type="button" style="--c:#E07B39" data-c="#E07B39" data-n="Naranja" aria-pressed="true" aria-label="Naranja"></button>
+            <button class="chip" type="button" style="--c:#4E9BA6" data-c="#4E9BA6" data-n="Turquesa" aria-pressed="false" aria-label="Turquesa"></button>
+            <button class="chip" type="button" style="--c:#EFE3C8" data-c="#EFE3C8" data-n="Crema" aria-pressed="false" aria-label="Crema"></button>
+            <button class="chip" type="button" style="--c:#C4553B" data-c="#C4553B" data-n="Rojo" aria-pressed="false" aria-label="Rojo"></button>
+            <button class="chip off" type="button" data-c="#000000" data-n="Apagada" aria-pressed="false">Apagar</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="logTitle">
+        <div class="card-h">
+          <h2 id="logTitle">Bitácora</h2>
+          <span class="eyebrow">Eventos de la misión</span>
+        </div>
+        <ul class="log" id="log" aria-live="polite"></ul>
+      </section>
+
+      <details class="card" id="cfgBox">
+        <summary>Conexión con la pechera</summary>
+        <div class="cfg">
+          <p class="note">Sin conexión, la página corre en modo demo con una Laika simulada. Para datos reales, pegá la URL de tu Realtime Database de Firebase.</p>
+          <label for="fbUrl">URL de Firebase
+            <input id="fbUrl" type="url" placeholder="https://laika-xxxx-default-rtdb.firebaseio.com" autocomplete="off" spellcheck="false">
+          </label>
+          <div class="btns">
+            <button class="btn solid" type="button" id="connectBtn">Conectar</button>
+            <button class="btn" type="button" id="demoBtn">Volver a demo</button>
+            <button class="btn" type="button" id="geoBtn">Usar mi ubicación como centro</button>
+          </div>
+          <p class="note">La pechera escribe su posición en <code>/laika/estado</code> y lee las órdenes en <code>/laika/comando</code>:</p>
+<pre>/laika/estado   { "lat": 10.01631, "lon": -84.21162,
+                  "sats": 7, "bat": 82,
+                  "ts": {".sv": "timestamp"} }
+
+/laika/comando  { "buzzer": true,
+                  "modo": "busqueda" | "normal",
+                  "color": "#E07B39" }</pre>
+          <p class="note">La IdeaBoard pone <code>buzzer</code> en <code>false</code> después de sonar.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <footer><img src="assets/laika-astronauta.png" alt="" width="28" height="28" style="vertical-align:middle;margin-right:8px;border-radius:50%">Proyecto Laika · San Diego Bilingual High School · Competencia LUVÁ 2026</footer>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const css = getComputedStyle(document.documentElement);
+  const C = k => css.getPropertyValue(k).trim();
+  const COL = { panel:C('--panel'), night:C('--night'), teal:C('--teal'), teal2:C('--teal-2'), cream:C('--cream'), muted:C('--muted'), orange:C('--orange'), rust:C('--rust') };
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const S = {
+    mode:'demo', url:'', base:null, baseLbl:'punto de partida', pos:null, prev:null,
+    trail:[], lastTs:null, sats:null, bat:null, speed:null,
+    search:false, color:'#E07B39', ping:0, err:false, lost:false, timer:null, geoWatch:null
+  };
+
+  /* ---------- Geografía ---------- */
+  const R = 6371000, rad = d => d*Math.PI/180, deg = r => r*180/Math.PI;
+  function dist(a,b){
+    const dLat=rad(b.lat-a.lat), dLon=rad(b.lon-a.lon);
+    const h=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(h));
+  }
+  function bearing(a,b){
+    const y=Math.sin(rad(b.lon-a.lon))*Math.cos(rad(b.lat));
+    const x=Math.cos(rad(a.lat))*Math.sin(rad(b.lat))-Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(rad(b.lon-a.lon));
+    return (deg(Math.atan2(y,x))+360)%360;
+  }
+  function offset(p,m,brg){
+    const b=rad(brg);
+    return { lat:p.lat+(m*Math.cos(b))/111320, lon:p.lon+(m*Math.sin(b))/(111320*Math.cos(rad(p.lat))) };
+  }
+  const PUNTOS=['N','NE','E','SE','S','SO','O','NO'];
+  const compass = b => PUNTOS[Math.round(b/45)%8];
+  const fmtM = m => m<1000 ? Math.round(m)+' m' : (m/1000).toFixed(m<10000?2:1)+' km';
+  const hhmmss = d => d.toLocaleTimeString('es-CR',{hour12:false});
+
+  /* ---------- Bitácora ---------- */
+  function log(txt,kind=''){
+    const li=document.createElement('li'); if(kind) li.className=kind;
+    li.innerHTML=`<time>${hhmmss(new Date())}</time><span></span>`;
+    li.lastChild.textContent=txt;
+    const ul=$('#log'); ul.prepend(li);
+    while(ul.children.length>30) ul.lastChild.remove();
+  }
+
+  /* ---------- Datos entrantes ---------- */
+  function ingest(d){
+    if(typeof d.lat!=='number'||typeof d.lon!=='number') return;
+    const p={lat:d.lat,lon:d.lon};
+    let ts=Date.now();
+    if(typeof d.ts==='number'){ ts = d.ts>1e12 ? d.ts : (d.ts>1e9 ? d.ts*1000 : ts); }
+    const first=!S.pos;
+    if(S.pos && S.lastTs && ts>S.lastTs){ S.speed = dist(S.pos,p)/((ts-S.lastTs)/1000); }
+    if(S.pos && S.pos.lat===p.lat && S.pos.lon===p.lon && ts===S.lastTs) return;
+    S.pos=p; S.lastTs=ts;
+    if(!S.base){ S.base={...p}; }
+    S.sats = d.sats ?? S.sats; S.bat = d.bat ?? S.bat;
+    S.trail.push(p); if(S.trail.length>40) S.trail.shift();
+    if(first) log(S.mode==='demo'?'Primera posición simulada recibida':'Señal recibida: Laika está en línea');
+    if(S.lost){ S.lost=false; log('Señal recuperada'); }
+    render();
+  }
+
+  function render(){
+    if(!S.pos) return;
+    const d=dist(S.base,S.pos), b=bearing(S.base,S.pos);
+    $('#tDist').textContent = fmtM(d);
+    $('#tDir').innerHTML = d<3 ? 'Aquí' : `${compass(b)}<small>${Math.round(b)}°</small>`;
+    $('#tSats').textContent = S.sats ?? '—';
+    const bat=$('#tBat');
+    if(S.bat!=null){ bat.textContent=Math.round(S.bat)+' %'; bat.dataset.l = S.bat<20?'low':S.bat<50?'mid':'ok'; }
+    $('#tSpd').innerHTML = S.speed!=null ? `${(S.speed*3.6).toFixed(1)}<small>km/h</small>` : '—';
+    $('#tCoords').textContent = `${S.pos.lat.toFixed(5)}, ${S.pos.lon.toFixed(5)}`;
+    const a=$('#mapLink'); a.href=`https://www.google.com/maps?q=${S.pos.lat},${S.pos.lon}`; a.removeAttribute('aria-disabled');
+  }
+
+  /* ---------- Estado de conexión ---------- */
+  function tick(){
+    const pill=$('#status'), t=$('#statusTxt');
+    const age = S.lastTs ? Math.max(0,Math.round((Date.now()-S.lastTs)/1000)) : null;
+    $('#tAge').innerHTML = age==null ? '—' : (age<60 ? `${age}<small>s</small>` : `${Math.floor(age/60)}<small>min</small>`);
+    if(S.mode==='demo'){ pill.dataset.s='demo'; t.textContent='Demo · datos simulados'; return; }
+    if(S.err){ pill.dataset.s='lost'; t.textContent='Error de conexión'; return; }
+    if(age==null){ pill.dataset.s='wait'; t.textContent='Esperando señal…'; return; }
+    if(age<=30){ pill.dataset.s='ok'; t.textContent='En línea'; }
+    else { pill.dataset.s='lost'; t.textContent=`Sin señal hace ${age<60?age+' s':Math.floor(age/60)+' min'}`;
+      if(!S.lost){ S.lost=true; log('Se perdió la señal de la pechera','warn'); } }
+  }
+  setInterval(tick,1000);
+
+  /* ---------- Modo demo ---------- */
+  const demo={heading:Math.random()*360, bat:87};
+  const DEMO_BASE={lat:10.01631,lon:-84.21162};
+  function demoStep(){
+    if(!S.base) S.base={...DEMO_BASE};
+    let p=S.pos || offset(S.base,28,50);
+    demo.heading += (Math.random()-.5)*70;
+    if(dist(S.base,p)>85) demo.heading = bearing(p,S.base)+(Math.random()-.5)*40;
+    const step = Math.random()<.25 ? 0 : 2+Math.random()*7;
+    const np = offset(p,step,demo.heading);
+    demo.bat = Math.max(4,demo.bat-0.04);
+    ingest({lat:np.lat,lon:np.lon,sats:6+Math.floor(Math.random()*4),bat:demo.bat,ts:Date.now()});
+  }
+  function startDemo(){
+    stop(); S.mode='demo'; S.err=false; resetTrack(true);
+    demoStep(); S.timer=setInterval(demoStep,2500);
+    log('Modo demo activo: Laika simulada paseando cerca del centro');
+    tick();
+  }
+
+  /* ---------- Firebase (REST, sin librerías) ---------- */
+  async function poll(){
+    try{
+      const r=await fetch(`${S.url}/laika/estado.json`,{cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const d=await r.json();
+      if(S.err){ S.err=false; log('Conexión con Firebase restablecida'); }
+      if(d) ingest(d);
+    }catch(e){
+      if(!S.err){ S.err=true; log('No se pudo leer Firebase. Revisá la URL y que las reglas permitan leer.','warn'); }
+    }
+    tick();
+  }
+  async function sendCmd(cmd){
+    if(S.mode==='demo') return true;
+    try{
+      const r=await fetch(`${S.url}/laika/comando.json`,{method:'PATCH',body:JSON.stringify({...cmd,t:{'.sv':'timestamp'}})});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return true;
+    }catch(e){ log('La orden no llegó a Firebase. Revisá la conexión y las reglas de escritura.','warn'); return false; }
+  }
+  function connect(){
+    let u=$('#fbUrl').value.trim().replace(/\/+$/,'');
+    if(!u){ log('Pegá la URL de Firebase antes de conectar','warn'); $('#fbUrl').focus(); return; }
+    if(!/^https?:\/\//.test(u)) u='https://'+u;
+    $('#fbUrl').value=u;
+    try{ localStorage.setItem('laika-fb',u); }catch(e){}
+    stop(); S.mode='live'; S.url=u; S.err=false; resetTrack(false);
+    log('Conectando con la pechera…');
+    poll(); S.timer=setInterval(poll,3000);
+  }
+  function stop(){ if(S.timer) clearInterval(S.timer); S.timer=null; }
+  function resetTrack(){
+    S.pos=null; S.trail=[]; S.lastTs=null; S.speed=null; S.lost=false;
+    if(S.baseLbl!=='tu ubicación') S.base=null;
+    ['#tDist','#tDir','#tSats','#tBat','#tSpd','#tAge'].forEach(s=>$(s).textContent='—');
+    $('#tCoords').textContent='Esperando la primera posición';
+    $('#mapLink').setAttribute('aria-disabled','true');
+  }
+
+  /* ---------- Mi ubicación ---------- */
+  $('#geoBtn').addEventListener('click',()=>{
+    if(!navigator.geolocation){ log('Este navegador no da la ubicación','warn'); return; }
+    try{
+      S.geoWatch = navigator.geolocation.watchPosition(p=>{
+        const first = S.baseLbl!=='tu ubicación';
+        S.base={lat:p.coords.latitude,lon:p.coords.longitude};
+        S.baseLbl='tu ubicación'; $('#baseLbl').textContent='tu ubicación';
+        if(first){
+          log('Centro del radar: tu ubicación');
+          if(S.mode==='demo'){ S.pos=null; S.trail=[]; demoStep(); }
+        }
+        render();
+      },()=>{ log('No se pudo leer tu ubicación. Dale permiso al navegador o abrí la página publicada en GitHub Pages.','warn'); },
+      {enableHighAccuracy:true,maximumAge:5000});
+    }catch(e){ log('No se pudo leer tu ubicación en esta vista','warn'); }
+  });
+
+  /* ---------- Controles ---------- */
+  $('#callBtn').addEventListener('click', async ()=>{
+    if(await sendCmd({buzzer:true})){
+      S.ping=performance.now();
+      log(S.mode==='demo'?'Llamada enviada: el buzzer suena en la pechera (simulado)':'Llamada enviada: el buzzer va a sonar','cmd');
+    }
+  });
+  $('#searchSw').addEventListener('change', async e=>{
+    S.search=e.target.checked;
+    if(await sendCmd({modo:S.search?'busqueda':'normal'}))
+      log(S.search?'Modo búsqueda activado: luz parpadeando':'Modo búsqueda desactivado','cmd');
+  });
+  $('#chips').addEventListener('click', async e=>{
+    const b=e.target.closest('.chip'); if(!b) return;
+    document.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',c===b));
+    S.color=b.dataset.c; $('#ledTxt').textContent=b.dataset.n;
+    if(await sendCmd({color:S.color})) log(`Luz de la pechera: ${b.dataset.n.toLowerCase()}`,'cmd');
+  });
+  $('#connectBtn').addEventListener('click',connect);
+  $('#demoBtn').addEventListener('click',startDemo);
+
+  /* ---------- Radar ---------- */
+  const cv=$('#radar'), ctx=cv.getContext('2d');
+  let W=0;
+  function size(){
+    const r=cv.getBoundingClientRect(), dpr=Math.min(2,window.devicePixelRatio||1);
+    W=r.width; cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  new ResizeObserver(size).observe(cv); size();
+
+  const dogImg=new Image(); dogImg.src='assets/laika-astronauta.png';
+  function drawPaw(x,y,ang,sz,col,a){
+    ctx.save(); ctx.translate(x,y); ctx.rotate(ang); ctx.globalAlpha=a; ctx.fillStyle=col;
+    ctx.beginPath(); ctx.ellipse(0,sz*.25,sz*.46,sz*.4,0,0,Math.PI*2); ctx.fill();
+    [[-.58,-.22],[-.2,-.55],[.2,-.55],[.58,-.22]].forEach(([tx,ty])=>{ ctx.beginPath(); ctx.arc(tx*sz,ty*sz,sz*.19,0,Math.PI*2); ctx.fill(); });
+    ctx.restore();
+  }
+  const SCALES=[20,40,100,200,400,1000,2000,4000,10000,20000,40000];
+  let scale=100;
+  function rgba(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+
+  function draw(now){
+    const w=W, c=w/2, rMax=c-26;
+    ctx.clearRect(0,0,w,w);
+    if(w<50){ requestAnimationFrame(draw); return; }
+
+    // Escala automática
+    let far=0;
+    if(S.pos&&S.base){ far=dist(S.base,S.pos); S.trail.forEach(p=>far=Math.max(far,dist(S.base,p))); }
+    scale = SCALES.find(s=>s>=far*1.15) || SCALES[SCALES.length-1];
+    $('#scaleTxt').textContent='Escala '+fmtM(scale);
+
+    // Disco
+    const g=ctx.createRadialGradient(c,c,0,c,c,rMax);
+    g.addColorStop(0,rgba(COL.teal,.28)); g.addColorStop(1,rgba(COL.night,.9));
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(c,c,rMax,0,Math.PI*2); ctx.fill();
+
+    // Anillos
+    ctx.font=`500 11px ${getComputedStyle(document.body).getPropertyValue('--f-mono')||'monospace'}`;
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    for(let i=1;i<=4;i++){
+      const r=rMax*i/4;
+      ctx.strokeStyle=rgba(COL.teal2,i===4?.55:.25); ctx.lineWidth=i===4?1.5:1;
+      ctx.setLineDash(i===4?[]:[3,5]);
+      ctx.beginPath(); ctx.arc(c,c,r,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle=rgba(COL.cream,.55);
+      ctx.fillText(fmtM(scale*i/4), c+r*Math.cos(-Math.PI/4)+4, c+r*Math.sin(-Math.PI/4)-6);
+    }
+    // Ejes
+    ctx.strokeStyle=rgba(COL.teal2,.18); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(c,c-rMax); ctx.lineTo(c,c+rMax); ctx.moveTo(c-rMax,c); ctx.lineTo(c+rMax,c); ctx.stroke();
+    // Rosa de los vientos
+    ctx.textAlign='center'; ctx.fillStyle=COL.cream; ctx.font=`600 13px "Fredoka", system-ui, sans-serif`;
+    [['N',0,-1],['E',1,0],['S',0,1],['O',-1,0]].forEach(([t,x,y])=>{
+      ctx.fillStyle = t==='N'?COL.orange:rgba(COL.cream,.7);
+      ctx.fillText(t,c+x*(rMax+14),c+y*(rMax+14));
+    });
+
+    // Barrido
+    const ang = reduce ? -Math.PI/2 : ((now/1000)*Math.PI*0.55)%(Math.PI*2) - Math.PI/2;
+    if(!reduce){
+      const span=0.9;
+      if(ctx.createConicGradient){
+        const cg=ctx.createConicGradient(ang-span,c,c);
+        const f=span/(Math.PI*2);
+        cg.addColorStop(0,rgba(COL.teal2,0)); cg.addColorStop(f*.999,rgba(COL.teal2,.38)); cg.addColorStop(f,rgba(COL.teal2,0)); cg.addColorStop(1,rgba(COL.teal2,0));
+        ctx.fillStyle=cg; ctx.beginPath(); ctx.arc(c,c,rMax,0,Math.PI*2); ctx.fill();
+      }
+      ctx.strokeStyle=rgba(COL.teal2,.9); ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(c,c); ctx.lineTo(c+rMax*Math.cos(ang),c+rMax*Math.sin(ang)); ctx.stroke();
+    }
+
+    const toXY = p => { const d=dist(S.base,p), b=rad(bearing(S.base,p)), r=Math.min(rMax,d/scale*rMax); return [c+r*Math.sin(b), c-r*Math.cos(b)]; };
+
+    if(S.base && S.trail.length>1){
+      let last=null, side=1, n=S.trail.length;
+      for(let i=1;i<n;i++){
+        const [x0,y0]=toXY(S.trail[i-1]), [x1,y1]=toXY(S.trail[i]);
+        if(last && Math.hypot(x1-last[0],y1-last[1])<14) continue;
+        const ang=Math.atan2(x1-x0,-(y1-y0));
+        const ox=Math.cos(ang)*4*side, oy=Math.sin(ang)*4*side; side*=-1;
+        if(i<n-1) drawPaw(x1+ox,y1+oy,ang,9,COL.teal2,.25+.65*i/n);
+        last=[x1,y1];
+      }
+    }
+
+    // Centro
+    ctx.strokeStyle=COL.cream; ctx.fillStyle=COL.night; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(c,c,6,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=COL.cream; ctx.beginPath(); ctx.arc(c,c,2,0,Math.PI*2); ctx.fill();
+
+    if(S.pos && S.base){
+      const [x,y]=toXY(S.pos);
+      const R0=Math.max(18,w*.045);
+      // Línea al centro
+      ctx.strokeStyle=rgba(COL.cream,.25); ctx.setLineDash([4,6]); ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(c,c); ctx.lineTo(x,y); ctx.stroke(); ctx.setLineDash([]);
+
+      const lost = S.mode==='live' && S.lastTs && Date.now()-S.lastTs>30000;
+      let dotCol = lost ? COL.muted : COL.orange;
+      if(S.search && !lost && S.color!=='#000000'){
+        const on = reduce ? true : Math.floor(now/400)%2===0;
+        dotCol = on ? S.color : rgba(S.color,.25);
+      }
+
+      // Ondas del buzzer
+      const since=now-S.ping;
+      if(S.ping && since<2600){
+        for(let k=0;k<3;k++){
+          const t=((since/1000)-k*0.35); if(t<0||t>1.6) continue;
+          ctx.strokeStyle=rgba(COL.orange,Math.max(0,.8-t/2)); ctx.lineWidth=2;
+          ctx.beginPath(); ctx.arc(x,y,R0+4+t*45,0,Math.PI*2); ctx.stroke();
+        }
+      }
+      // Halo
+      if(!lost){
+        const pulse = reduce ? .5 : (Math.sin(now/300)+1)/2;
+        ctx.fillStyle=rgba(COL.orange,.12+.14*pulse);
+        ctx.beginPath(); ctx.arc(x,y,R0+8+5*pulse,0,Math.PI*2); ctx.fill();
+      }
+      // Rumbo (flecha según hacia dónde camina)
+      if(S.trail.length>1 && !lost){
+        const [px,py]=toXY(S.trail[S.trail.length-2]);
+        if(Math.hypot(x-px,y-py)>1.5){
+          const a=Math.atan2(y-py,x-px);
+          ctx.fillStyle=COL.orange; ctx.beginPath();
+          ctx.moveTo(x+Math.cos(a)*(R0+13),y+Math.sin(a)*(R0+13));
+          ctx.lineTo(x+Math.cos(a+.3)*(R0+4),y+Math.sin(a+.3)*(R0+4));
+          ctx.lineTo(x+Math.cos(a-.3)*(R0+4),y+Math.sin(a-.3)*(R0+4));
+          ctx.fill();
+        }
+      }
+      // Laika astronauta
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x,y,R0,0,Math.PI*2); ctx.closePath();
+      ctx.fillStyle=COL.teal; ctx.fill();
+      ctx.clip();
+      if(lost) ctx.filter='grayscale(1) brightness(.75)';
+      if(dogImg.complete && dogImg.naturalWidth) ctx.drawImage(dogImg,x-R0,y-R0,R0*2,R0*2);
+      ctx.restore();
+      ctx.lineWidth=3; ctx.strokeStyle = (S.search && !lost && S.color!=='#000000') ? dotCol : (lost?COL.muted:COL.orange);
+      ctx.beginPath(); ctx.arc(x,y,R0+1.5,0,Math.PI*2); ctx.stroke();
+
+      ctx.font=`600 12px "Fredoka", system-ui, sans-serif`;
+      ctx.fillStyle=COL.cream; ctx.textAlign = x>c+rMax*.6 ? 'right':'left';
+      ctx.fillText('LAIKA', x + (ctx.textAlign==='right'?-(R0+8):R0+8), y-R0-4);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+
+  /* ---------- Arranque ---------- */
+  const DEFAULT_URL='https://laika-sdbhs-a3597-default-rtdb.firebaseio.com';
+  let saved=null; try{ saved=localStorage.getItem('laika-fb'); }catch(e){}
+  $('#fbUrl').value = saved || DEFAULT_URL;
+  connect();
+})();
+</script>
+
+</body>
+</html>

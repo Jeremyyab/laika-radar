@@ -59,6 +59,11 @@ header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-betw
 .patch img{display:block;height:clamp(56px,13vw,100px);width:auto;max-width:100%}
 .tagline{color:var(--muted);font-size:.95rem;letter-spacing:.04em;display:flex;align-items:center;gap:8px}
 .tagline::before{content:"";width:7px;height:7px;background:var(--orange);clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%)}
+.net{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.netbtn{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--teal-2);background:var(--teal);color:var(--cream);font-family:var(--f-body);font-weight:700;font-size:.85rem;cursor:pointer}
+.netbtn[aria-pressed="true"]{background:transparent;border-color:var(--rust);color:var(--cream)}
+.netbtn:hover{filter:brightness(1.12)}
+.pill[data-s="off"] i{background:var(--muted);box-shadow:none}
 .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-family:var(--f-mono);font-size:.78rem;letter-spacing:.04em;border:1px solid var(--line);background:var(--panel);white-space:nowrap}
 .pill i{width:9px;height:9px;border-radius:50%;background:var(--teal-2);display:block}
 .pill[data-s="ok"] i{background:var(--teal-2);box-shadow:0 0 0 4px rgba(78,155,166,.2)}
@@ -158,7 +163,13 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;letter-spacing:.03em
       <h1 class="logo"><span class="patch"><img src="assets/laika-logo.jpg" alt="Laika" width="1220" height="505"></span></h1>
       <span class="tagline">Huellas que alcanzaron las estrellas</span>
     </div>
-    <span class="pill" id="status" data-s="demo"><i></i><span id="statusTxt">Demo · datos simulados</span></span>
+    <div class="net">
+      <span class="pill" id="status" data-s="demo"><i></i><span id="statusTxt">Demo · datos simulados</span></span>
+      <button class="netbtn" type="button" id="netBtn" aria-pressed="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>
+        <span id="netTxt">Conectar</span>
+      </button>
+    </div>
   </header>
 
   <div class="grid">
@@ -334,7 +345,9 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;letter-spacing:.03em
     const pill=$('#status'), t=$('#statusTxt');
     const age = S.lastTs ? Math.max(0,Math.round((Date.now()-S.lastTs)/1000)) : null;
     $('#tAge').innerHTML = age==null ? '—' : (age<60 ? `${age}<small>s</small>` : `${Math.floor(age/60)}<small>min</small>`);
+    syncNet();
     if(S.mode==='demo'){ pill.dataset.s='demo'; t.textContent='Demo · datos simulados'; return; }
+    if(S.mode==='off'){ pill.dataset.s='off'; t.textContent='Desconectado'; return; }
     if(S.err){ pill.dataset.s='lost'; t.textContent='Error de conexión'; return; }
     if(age==null){ pill.dataset.s='wait'; t.textContent='Esperando señal…'; return; }
     if(age<=30){ pill.dataset.s='ok'; t.textContent='En línea'; }
@@ -378,6 +391,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;letter-spacing:.03em
   }
   async function sendCmd(cmd){
     if(S.mode==='demo') return true;
+    if(S.mode==='off'){ log('Estás desconectado. Tocá Conectar para enviarle órdenes a la pechera.','warn'); return false; }
     try{
       const r=await fetch(`${S.url}/laika/comando.json`,{method:'PATCH',body:JSON.stringify({...cmd,t:{'.sv':'timestamp'}})});
       if(!r.ok) throw new Error('HTTP '+r.status);
@@ -390,11 +404,23 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;letter-spacing:.03em
     if(!/^https?:\/\//.test(u)) u='https://'+u;
     $('#fbUrl').value=u;
     try{ localStorage.setItem('laika-fb',u); }catch(e){}
-    stop(); S.mode='live'; S.url=u; S.err=false; resetTrack(false);
-    log('Conectando con la pechera…');
+    const resume = S.mode==='off' && S.url===u;
+    stop(); S.mode='live'; S.url=u; S.err=false; if(!resume) resetTrack(false);
+    log(resume?'Reconectando con la pechera…':'Conectando con la pechera…'); syncNet();
     poll(); S.timer=setInterval(poll,3000);
   }
   function stop(){ if(S.timer) clearInterval(S.timer); S.timer=null; }
+  function disconnect(){
+    stop(); S.mode='off'; S.err=false; S.lost=false;
+    log('Desconectado de la pechera. El radar muestra la última ubicación recibida.');
+    tick();
+  }
+  function syncNet(){
+    const live=S.mode==='live';
+    $('#netBtn').setAttribute('aria-pressed',live);
+    $('#netTxt').textContent = live ? 'Desconectar' : 'Conectar';
+  }
+  $('#netBtn').addEventListener('click',()=>{ S.mode==='live' ? disconnect() : connect(); syncNet(); });
   function resetTrack(){
     S.pos=null; S.trail=[]; S.lastTs=null; S.speed=null; S.lost=false;
     if(S.baseLbl!=='tu ubicación') S.base=null;
@@ -541,7 +567,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;letter-spacing:.03em
       ctx.strokeStyle=rgba(COL.cream,.25); ctx.setLineDash([4,6]); ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(c,c); ctx.lineTo(x,y); ctx.stroke(); ctx.setLineDash([]);
 
-      const lost = S.mode==='live' && S.lastTs && Date.now()-S.lastTs>30000;
+      const lost = S.mode==='off' || (S.mode==='live' && S.lastTs && Date.now()-S.lastTs>30000);
       let dotCol = lost ? COL.muted : COL.orange;
       if(S.search && !lost && S.color!=='#000000'){
         const on = reduce ? true : Math.floor(now/400)%2===0;

@@ -1,6 +1,6 @@
 # Laika Radar
 
-**Más cerca, siempre.**
+**Huellas que alcanzaron las estrellas.**
 
 Página web de **Laika**, la pechera inteligente para mascotas: muestra la ubicación en tiempo real en un radar y permite activar el buzzer y la luz de la pechera para encontrarla.
 
